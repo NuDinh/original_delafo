@@ -1,3 +1,11 @@
+# update date: 05 Feb 2023
+# main.py 
+#  1. row 60 model.name => model._name
+#  2. add code to calculate mean & std of Sharpe ratio in function def train_model()
+#  3. fix save model with error: models/attention_layer.py add function: def get_config(self):
+
+
+
 import argparse
 from preprocess_data import *
 from utils import *
@@ -57,7 +65,7 @@ class DELAFO:
             hyper_params = load_config_file(model_config_path[model_name])
             hyper_params['input_shape'] = (X.shape[1],X.shape[2],X.shape[3])
             model = build_selfatt_lstm_model(hyper_params)
-        model.name = model_name
+        model._name = model_name
 
         return cls(model_name,model,X,y,tickers,timesteps_input,timesteps_output)
 
@@ -84,19 +92,40 @@ class DELAFO:
             json.dump(his, outfile,cls=MyEncoder, indent=2)
         print("write file log at %s"%(os.path.join(path_dir,name_file)))
 
+
     def train_model(self,n_fold,batch_size,epochs):
         tscv = TimeSeriesSplit(n_splits=n_fold)
+        all_ratio = []
         for train_index, test_index in tscv.split(self.X):
-
             X_tr, X_val = self.X[train_index], self.X[test_index[range(self.timesteps_output-1,len(test_index),self.timesteps_output)]]
             y_tr, y_val = self.y[train_index], self.y[test_index[range(self.timesteps_output-1,len(test_index),self.timesteps_output)]]
 
             his = self.model.fit(X_tr, y_tr, batch_size=batch_size, epochs= epochs,validation_data=(X_val,y_val))
             mask_tickers = self.predict_portfolio(X_val)
+            temp = [self.calc_sharpe_ratio(mask_tickers[i],y_val[i]) for i in range(len(y_val))]
+            all_ratio.append(temp)
             print('Sharpe ratio of this portfolio: %s' % str([self.calc_sharpe_ratio(mask_tickers[i],y_val[i]) for i in range(len(y_val))]))
 
             self.write_log(his,'./logs/%s' % self.model_name,"log_%d.txt"%(test_index[-1]))
+
+        all_ratio = np.asarray(all_ratio)
+        mean_all_ratio = np.mean(all_ratio, axis= 1)
+        print('Mean: {}, std {}'.format(np.mean(mean_all_ratio), np.std(mean_all_ratio)))
         self.visualize_log('./logs',self.model_name)
+
+    # def train_model(self,n_fold,batch_size,epochs):
+    #     tscv = TimeSeriesSplit(n_splits=n_fold)
+    #     for train_index, test_index in tscv.split(self.X):
+
+    #         X_tr, X_val = self.X[train_index], self.X[test_index[range(self.timesteps_output-1,len(test_index),self.timesteps_output)]]
+    #         y_tr, y_val = self.y[train_index], self.y[test_index[range(self.timesteps_output-1,len(test_index),self.timesteps_output)]]
+
+    #         his = self.model.fit(X_tr, y_tr, batch_size=batch_size, epochs= epochs,validation_data=(X_val,y_val))
+    #         mask_tickers = self.predict_portfolio(X_val)
+    #         print('Sharpe ratio of this portfolio: %s' % str([self.calc_sharpe_ratio(mask_tickers[i],y_val[i]) for i in range(len(y_val))]))
+
+    #         self.write_log(his,'./logs/%s' % self.model_name,"log_%d.txt"%(test_index[-1]))
+    #     self.visualize_log('./logs',self.model_name)
 
     def save_model(self,path_dir="pretrain_model"):
         if os.path.exists(os.path.join(path_dir,self.model_name))==False:

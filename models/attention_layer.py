@@ -9,6 +9,13 @@ class AdditiveAttentionLayer(Layer):
 		self.latent_dim = latent_dim
 		self.kernel_regularizer = regularizers.get(kernel_regularizer)
 		super(AdditiveAttentionLayer, self).__init__(**kwargs)
+	
+	def get_config(self):
+		config = super(AdditiveAttentionLayer, self).get_config()
+		config.update({
+						"arg1": self.latent_dim,
+						"arg2": self.kernel_regularizer,})
+		return config
 
 	def build(self, input_shape):
 		in_seq_shape = input_shape[0]
